@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AgentTripwire"
+description = "A defensive AI-agent security dashboard that analyzes inert traces across six risk classes with transparent evidence, analyst triage, evaluation, and incident report export."
+version = "1.0.0"
+id = "artifacts/sentinel-scope"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23936
+
+[services.development]
+run = "pnpm --filter @workspace/sentinel-scope run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/sentinel-scope", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/sentinel-scope/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23936"
+BASE_PATH = "/"

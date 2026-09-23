@@ -1,0 +1,373 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 1.0.0
+  description: AgentTripwire local AI-agent trace analysis API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: agent-tripwire
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /agent-tripwire/dashboard:
+    get:
+      operationId: getDashboard
+      tags: [agent-tripwire]
+      responses:
+        "200":
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /agent-tripwire/demos:
+    get:
+      operationId: listDemos
+      tags: [agent-tripwire]
+      responses:
+        "200":
+          description: Safe sample traces
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DemoTrace"
+  /agent-tripwire/analyze:
+    post:
+      operationId: analyzeTrace
+      tags: [agent-tripwire]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TraceInput"
+      responses:
+        "201":
+          description: Trace analyzed and case saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentCase"
+  /agent-tripwire/cases:
+    get:
+      operationId: listCases
+      tags: [agent-tripwire]
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: severity
+          schema:
+            $ref: "#/components/schemas/Severity"
+      responses:
+        "200":
+          description: Searchable case history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaseSummary"
+  /agent-tripwire/cases/{id}:
+    get:
+      operationId: getCase
+      tags: [agent-tripwire]
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Full incident case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentCase"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateCase
+      tags: [agent-tripwire]
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseUpdate"
+      responses:
+        "200":
+          description: Updated case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentCase"
+  /agent-tripwire/cases/{id}/report:
+    get:
+      operationId: exportCaseReport
+      tags: [agent-tripwire]
+      parameters:
+        - $ref: "#/components/parameters/CaseId"
+      responses:
+        "200":
+          description: Printable HTML incident report
+          content:
+            text/html:
+              schema:
+                type: string
+  /agent-tripwire/evaluation:
+    get:
+      operationId: getEvaluation
+      tags: [agent-tripwire]
+      responses:
+        "200":
+          description: Detector precision and recall evaluation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evaluation"
+components:
+  parameters:
+    CaseId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+    Severity:
+      type: string
+      enum: [critical, high, medium, low, safe]
+    RiskType:
+      type: string
+      enum:
+        - direct_prompt_injection
+        - indirect_injection
+        - data_exfiltration
+        - unsafe_tool_use
+        - memory_poisoning
+        - prompt_extraction
+    CaseStatus:
+      type: string
+      enum: [new, investigating, contained, closed]
+    TraceInput:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        content:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        source:
+          type: string
+          maxLength: 80
+    CaseUpdate:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/CaseStatus"
+        analystNotes:
+          type: string
+          maxLength: 4000
+    Finding:
+      type: object
+      required: [id, riskType, label, severity, confidence, evidence, start, end, owasp, impact, mitigation]
+      properties:
+        id:
+          type: string
+        riskType:
+          $ref: "#/components/schemas/RiskType"
+        label:
+          type: string
+        severity:
+          $ref: "#/components/schemas/Severity"
+        confidence:
+          type: integer
+          minimum: 0
+          maximum: 100
+        evidence:
+          type: string
+        start:
+          type: integer
+        end:
+          type: integer
+        owasp:
+          type: string
+        impact:
+          type: string
+        mitigation:
+          type: string
+    TimelineEvent:
+      type: object
+      required: [time, stage, detail, outcome]
+      properties:
+        time:
+          type: string
+        stage:
+          type: string
+        detail:
+          type: string
+        outcome:
+          type: string
+    IncidentCase:
+      type: object
+      required: [id, title, source, content, createdAt, updatedAt, status, analystNotes, severity, score, findings, timeline]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        source:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/CaseStatus"
+        analystNotes:
+          type: string
+        severity:
+          $ref: "#/components/schemas/Severity"
+        score:
+          type: integer
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        timeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEvent"
+    CaseSummary:
+      type: object
+      required: [id, title, source, createdAt, status, severity, score, findingCount]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        source:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/CaseStatus"
+        severity:
+          $ref: "#/components/schemas/Severity"
+        score:
+          type: integer
+        findingCount:
+          type: integer
+    DemoTrace:
+      type: object
+      required: [id, label, riskType, description, content, expectedMalicious]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        riskType:
+          type: [string, "null"]
+        description:
+          type: string
+        content:
+          type: string
+        expectedMalicious:
+          type: boolean
+    RiskCount:
+      type: object
+      required: [riskType, label, count]
+      properties:
+        riskType:
+          $ref: "#/components/schemas/RiskType"
+        label:
+          type: string
+        count:
+          type: integer
+    Dashboard:
+      type: object
+      required: [totalCases, openCases, highRiskCases, averageScore, riskCounts, recentCases]
+      properties:
+        totalCases:
+          type: integer
+        openCases:
+          type: integer
+        highRiskCases:
+          type: integer
+        averageScore:
+          type: integer
+        riskCounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskCount"
+        recentCases:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaseSummary"
+    EvaluationRow:
+      type: object
+      required: [riskType, label, truePositive, falsePositive, falseNegative, precision, recall]
+      properties:
+        riskType:
+          $ref: "#/components/schemas/RiskType"
+        label:
+          type: string
+        truePositive:
+          type: integer
+        falsePositive:
+          type: integer
+        falseNegative:
+          type: integer
+        precision:
+          type: number
+        recall:
+          type: number
+    Evaluation:
+      type: object
+      required: [datasetSize, precision, recall, falsePositives, rows, methodology]
+      properties:
+        datasetSize:
+          type: integer
+        precision:
+          type: number
+        recall:
+          type: number
+        falsePositives:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvaluationRow"
+        methodology:
+          type: string
